@@ -16,4 +16,4 @@ the work laptop), with the goal of building a better one.
 ## Layout
 
 - `docs/` - analysis and design notes
-- `reference/` - verbatim copies of the PaperOrchestra plotting code (Apache-2.0, Copyright 2026 Google LLC), for study only
+- `reference/paper-orchestra/` - verbatim copies (original paths kept, source commit in SOURCE_COMMIT.txt) of the PaperOrchestra plotting code and its dependencies (Apache-2.0, Copyright 2026 Google LLC), for study only
