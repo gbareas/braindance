@@ -11,7 +11,7 @@ The standards are in `${CLAUDE_PLUGIN_ROOT}/skills/latex-scientific-plots/`: `SK
 
 ## Inputs
 
-You will be given the path to the plotting script, to the saved figure (PDF and/or PNG) and to the measured-check report (`<figure>.check.json`). If only a PDF exists, render a PNG preview to look at:
+You will be given the path to the plotting script, to the saved figure (PDF and/or PNG) and to the measured-check report (`<figure>.check.json`). If the figure belongs to a manuscript, there is a `figures.yaml` next to the main `.tex` file: its `target` gives the measured text width and font sizes, its entry for the figure the width the manuscript prints it at, and `FIGURES.md` beside it holds the caption. Judge size and font sizes against those, not against the generic table. If only a PDF exists, render a PNG preview to look at:
 
 ```bash
 pdftoppm -png -r 300 -singlefile figure.pdf /tmp/figure_review   # or: python -c "import fitz" ... / magick

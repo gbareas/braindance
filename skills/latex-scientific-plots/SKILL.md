@@ -12,6 +12,7 @@ Files in this skill's folder, `${CLAUDE_SKILL_DIR}`:
 - `latex-paper.mplstyle`: the house style.
 - `check_figure.py`: measured checks on the data and the style (section 9).
 - `chart-choice.md`: which chart suits which data, and the rules that hold for any chart. Read it before choosing a chart type, unless the user has already fixed one.
+- `figproject.py`: the figures of a LaTeX manuscript as a project (section 0.1): sizes measured from the document, a figure record, a caption index, a before/after comparison and a preview build.
 - `example.py` with `example_data/`: a full working example.
 
 ## 0. Data comes from files
@@ -20,6 +21,47 @@ Files in this skill's folder, `${CLAUDE_SKILL_DIR}`:
 - If the numbers arrive in the conversation, in a table or in a log, first save them to a CSV next to the script, show the user that file, and plot from it.
 - If the script computes what it plots (means, normalised curves, histograms), also write the plotted values to a CSV next to the figure and declare that file as the source, so the figure can be checked against it and the values can be handed to a journal as source data.
 - Give each data series a legend label or a `gid` so the checker can find it: `ax.errorbar(..., gid="run-1")`.
+
+## 0.1 Figures for a LaTeX manuscript: start from the document
+
+When the figures belong to a manuscript you can see (a `.tex` file), measure it instead of guessing sizes from the table in section 2:
+
+```bash
+python "${CLAUDE_SKILL_DIR}/figproject.py" init path/to/main.tex      # once, and after changing the class
+```
+
+This compiles the manuscript's preamble to read the text width, `\linewidth` inside `figure` and `figure*`, and the body and caption font sizes, then lists every `\includegraphics` with the width it is printed at, the file it includes now, and where the figure is cited. It writes two files next to `main.tex`:
+
+- `figures.yaml`, the record: the measured target, `output_dir` (where new figures go, default `braindance_figures/`, so the current figures are never overwritten), a free-form `style` section for the encoding shared by every figure of the paper, and one entry per figure. Put the colours, markers and line styles you choose in `style`, and read them from there in every script, so a series looks the same in every figure.
+- `FIGURES.md`, the index: one line per figure with its printed width, the scale its current file is printed at, and the result of the checks on the new version, then every caption, read from the `.tex` (the `.tex` stays the source of truth). Show it to the user.
+
+In the plotting script, use the project instead of `figsize` from section 2 and `savefig` from section 7:
+
+```python
+import sys
+sys.path.insert(0, "${CLAUDE_SKILL_DIR}")
+from figproject import Project
+
+proj = Project("path/to/figures.yaml")              # or main.tex, or its folder
+proj.setup()                                        # section 1, done for you
+colours = proj.style("field")                       # the shared encoding, if set
+proj.write_csv("spectrum_data", f_Hz=f, S=S)        # values computed in the script (section 0)
+fig, ax = plt.subplots(figsize=(proj.width("spectrum"), 2.4))   # the printed width of that figure
+...
+proj.finish(fig, "spectrum", sources=[{"label": "Data", "file": "spectrum_data.csv", "x": "f_Hz", "y": "S"}],
+            script=__file__)
+```
+
+`width(name)` is the width the manuscript prints that figure at (its `\includegraphics` file name without extension); for a figure the manuscript does not include yet, give a fraction of `\linewidth`: `proj.width("new_fig", 1.0)`. `finish()` saves the PDF and a 300 dpi PNG to `output_dir`, runs the measured checks of section 9.1 against the printed width with `sources` resolved in `output_dir/source_data/`, records the script, sources and result in `figures.yaml`, and updates `FIGURES.md`. It stops the script on a `fail`. Save the canvas as it is (`setup()` does): the figure is already the printed size, so never crop it with `bbox_inches="tight"`.
+
+After the figures are redrawn, show the user the result in two ways:
+
+```bash
+python "${CLAUDE_SKILL_DIR}/figproject.py" compare path/to/figures.yaml   # before_after.pdf in output_dir
+python "${CLAUDE_SKILL_DIR}/figproject.py" preview path/to/figures.yaml   # preview.pdf: the manuscript with the new figures
+```
+
+`compare` puts each current figure next to its new version, both at the printed width, with a table of scale factors and character sizes; add `--before DIR` for figures the manuscript does not include. `preview` compiles a copy of the manuscript with the new figures in place and reports the page each figure lands on; the manuscript folder is not touched. Never replace the user's figure files yourself: they decide when the new versions go in.
 
 ## 1. Setup (do this first, every time)
 
@@ -70,7 +112,7 @@ def figsize(width_in=3.4, ratio=0.618, nrows=1, ncols=1):
     return (width_in, width_in * ratio * nrows / ncols)
 ```
 
-If the user has a LaTeX document, ask for (or find) `\the\columnwidth` in points and convert: inches = pt / 72.27.
+If the user has a LaTeX document, measure it with `figproject.py init` (section 0.1) instead of using this table.
 
 ## 3. Fonts and sizes
 
