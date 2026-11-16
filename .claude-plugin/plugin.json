@@ -1,0 +1,11 @@
+{
+  "name": "braindance",
+  "version": "0.1.0",
+  "description": "Publication-ready scientific figures: LaTeX text, journal sizes, vector PDF, plotted values checked against the source data, and a figure reviewer.",
+  "author": {
+    "name": "gbareas",
+    "url": "https://github.com/gbareas"
+  },
+  "repository": "https://github.com/gbareas/braindance",
+  "keywords": ["matplotlib", "latex", "scientific-figures", "plotting", "papers"]
+}

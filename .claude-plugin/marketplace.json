@@ -1,0 +1,16 @@
+{
+  "name": "braindance",
+  "owner": {
+    "name": "gbareas",
+    "url": "https://github.com/gbareas"
+  },
+  "description": "The braindance plotting agent for scientific figures, as an installable Claude Code plugin.",
+  "plugins": [
+    {
+      "name": "braindance",
+      "source": "./",
+      "description": "Publication-ready scientific figures with LaTeX text, checked against the source data and reviewed before hand-over.",
+      "category": "science"
+    }
+  ]
+}
