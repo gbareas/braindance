@@ -116,6 +116,18 @@ def test_nonpositive_on_log_axis():
     assert found(run(fig, [SRC_A]), "log-axis", "fail")
 
 
+def test_guide_lines_are_not_data():
+    fig, ax = base_fig()
+    ax.set_xscale("log")
+    ax.set_xlim(0.3, 12)
+    ax.axhline(0.5, color="0.5", ls=":")
+    ax.axvline(2.0, color="0.5", ls=":")
+    src = [dict(SRC_A, allow_clipped=True), dict(SRC_B, allow_clipped=True)]
+    out = run(fig, src)
+    assert not found(out, "unverified"), out["findings"]
+    assert out["measured"]["series_in_figure"] == 2
+
+
 def test_declared_series_missing_and_undeclared_series():
     fig, ax = plt.subplots()
     ax.plot(T, A, "o", label="A")
@@ -168,6 +180,17 @@ def test_image_values():
     assert found(run(fig, [src]), "values", "fail")
 
 
+def test_colorbar_is_not_data():
+    z = np.arange(12.0).reshape(3, 4)
+    np.save(TMP / "zc.npy", z)
+    fig, ax = plt.subplots()
+    mesh = ax.pcolormesh(z, gid="map")
+    fig.colorbar(mesh, ax=ax)
+    out = run(fig, [{"gid": "map", "file": "zc.npy"}])
+    assert out["ok"] and not found(out, "unverified"), out["findings"]
+    assert out["measured"]["series_in_figure"] == 1
+
+
 # ---- style ----
 
 def test_small_font_and_bad_colormap_fail():
@@ -192,6 +215,13 @@ def test_legend_on_data_title_offset_width_and_colour_only():
     assert out["ok"]  # all of these are warnings, not failures
     for check in ("covers-data", "axes-title", "offset-text", "width", "colour-only"):
         assert found(out, check, "warn"), check
+
+
+def test_legend_cut_off():
+    fig, ax = base_fig()
+    ax.get_legend().remove()
+    fig.legend(loc="lower center", ncol=2, handlelength=40)
+    assert found(run(fig, [SRC_A, SRC_B]), "legend-cut", "fail")
 
 
 def test_overlapping_text():

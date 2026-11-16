@@ -218,6 +218,8 @@ def series_in_axes(ax, ax_index=0):
     for line in ax.lines:
         if id(line) in used:
             continue
+        if line.get_transform() != ax.transData:
+            continue  # axhline, axvline and other guides not drawn in data coordinates
         x = np.asarray(line.get_xdata(orig=False), dtype=float)
         y = np.asarray(line.get_ydata(orig=False), dtype=float)
         if x.size < 1:
@@ -233,6 +235,8 @@ def series_in_axes(ax, ax_index=0):
             out.append({"kind": "image", "artist": coll, "ax": ax_index, "label": _label_of(coll),
                         "gid": coll.get_gid() or "", "z": None if arr is None else np.ma.filled(arr, np.nan)})
         elif isinstance(coll, PathCollection):
+            if coll.get_offset_transform() != ax.transData:
+                continue
             off = np.ma.filled(coll.get_offsets(), np.nan)
             if len(off):
                 out.append({"kind": "scatter", "artist": coll, "ax": ax_index, "label": _label_of(coll),
@@ -244,6 +248,24 @@ def series_in_axes(ax, ax_index=0):
         out.append({"kind": "image", "artist": im, "ax": ax_index, "label": _label_of(im),
                     "gid": im.get_gid() or "", "z": None if arr is None else np.ma.filled(arr, np.nan)})
     return out
+
+
+def _colorbar_axes(fig):
+    """Axes that hold a colourbar: their colour ramp is not data."""
+    out = set()
+    for ax in fig.get_axes():
+        if ax.get_label() == "<colorbar>":
+            out.add(ax)
+        for art in list(ax.images) + list(ax.collections):
+            cb = getattr(art, "colorbar", None)
+            if cb is not None:
+                out.add(cb.ax)
+    return out
+
+
+def _all_series(fig):
+    skip = _colorbar_axes(fig)
+    return [s for i, ax in enumerate(fig.get_axes()) if ax not in skip for s in series_in_axes(ax, i)]
 
 
 def _name(s):
@@ -346,7 +368,7 @@ def _find(series, decl):
 
 def check_data(rep, fig, sources, base_dir=".", rtol=1e-6):
     axes = fig.get_axes()
-    series = [s for i, ax in enumerate(axes) for s in series_in_axes(ax, i)]
+    series = _all_series(fig)
     matched = set()
     loaded = []  # (declaration, source x, source y) for the swapped-label hint
     base_dir = Path(base_dir)
@@ -592,6 +614,18 @@ def check_style(rep, fig, target=None):
         rep.add("warn", "style", "off-canvas", "text extends beyond the figure, so a tight bounding box "
                 "will make the saved figure larger than its nominal size: "
                 + ", ".join(f"{d} {txt!r}" for d, txt in off[:5]))
+    legends = [(f"ax{i} legend", ax.get_legend()) for i, ax in enumerate(axes) if ax.get_legend() is not None]
+    legends += [("figure legend", leg) for leg in fig.legends]
+    for owner in getattr(fig, "subfigs", []):
+        legends += [("figure legend", leg) for leg in owner.legends]
+    cut = []
+    for d, leg in legends:
+        bb = leg.get_window_extent(renderer)
+        if bb.x0 < canvas.x0 - 1 or bb.x1 > canvas.x1 + 1 or bb.y0 < canvas.y0 - 1 or bb.y1 > canvas.y1 + 1:
+            cut.append(d)
+    if cut:
+        rep.add("fail", "style", "legend-cut", "legend extends beyond the figure and is cut off in the saved "
+                "file: " + ", ".join(cut) + "; use fewer columns or a smaller legend")
     pairs = []
     for i in range(len(boxes)):
         for j in range(i + 1, len(boxes)):
@@ -601,8 +635,9 @@ def check_style(rep, fig, target=None):
         rep.add("warn", "style", "text-overlap", f"{len(pairs)} pair(s) of text overlap: " + "; ".join(pairs[:6]))
 
     # per-axes checks
+    colorbar_axes = _colorbar_axes(fig)
     for i, ax in enumerate(axes):
-        series = series_in_axes(ax, i)
+        series = [] if ax in colorbar_axes else series_in_axes(ax, i)
         for nm, t in (("title", ax.title), ("left title", ax._left_title), ("right title", ax._right_title)):
             if t.get_text().strip() and not target.get("allow_title"):
                 rep.add("warn", "style", "axes-title", f"axes has a {nm} {t.get_text()!r}; in a paper the "
