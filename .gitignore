@@ -2,3 +2,10 @@ __pycache__/
 *.pyc
 *.check.json
 example_figure.*
+
+# docs/examples: everything but the images is rebuilt by build.py
+docs/examples/data/
+docs/examples/paper/figures/
+docs/examples/paper/braindance_figures/
+docs/examples/paper/figures.yaml
+docs/examples/paper/FIGURES.md

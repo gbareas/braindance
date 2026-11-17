@@ -1,0 +1,51 @@
+\documentclass[10pt]{article}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage[font=small,labelfont=bf]{caption}
+\graphicspath{{figures/}}
+
+\title{A synthetic manuscript for the braindance examples}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+All data in this document are synthetic, made by \texttt{make\_data.py}.
+Figure~\ref{fig:overview} shows the study, Fig.~\ref{fig:convergence} the grid convergence,
+Fig.~\ref{fig:results} the results per case and Fig.~\ref{fig:sweep} a hyperparameter sweep.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{overview}
+  \caption{Overview of the study. (a) Instantaneous temperature of the two validation cases.
+  (b) Training cases on a $3\times3$ grid of Reynolds number $Re$ and heating ratio $q$, and the two validation cases.
+  (c) Mean temperature profiles of all cases.}
+  \label{fig:overview}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.8\linewidth]{convergence}
+  \caption{Grid convergence of three schemes: $L_2$ error against the number of grid points $N$,
+  mean and range over five random initial conditions.}
+  \label{fig:convergence}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.7\linewidth]{results_table}
+  \caption{Error of the baseline and the proposed method for each case, the gain
+  $\Delta=\varepsilon_\mathrm{baseline}-\varepsilon_\mathrm{proposed}$ and the run time.}
+  \label{fig:results}
+\end{figure}
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\linewidth]{sweep}
+  \caption{Gain over the baseline, in percentage points, of two models across learning rate and network width.}
+  \label{fig:sweep}
+\end{figure}
+
+\end{document}

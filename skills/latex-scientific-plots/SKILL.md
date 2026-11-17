@@ -61,7 +61,7 @@ python "${CLAUDE_SKILL_DIR}/figproject.py" compare path/to/figures.yaml   # befo
 python "${CLAUDE_SKILL_DIR}/figproject.py" preview path/to/figures.yaml   # preview.pdf: the manuscript with the new figures
 ```
 
-`compare` puts each current figure next to its new version, both at the printed width, with a table of scale factors and character sizes; add `--before DIR` for figures the manuscript does not include. `preview` compiles a copy of the manuscript with the new figures in place and reports the page each figure lands on; the manuscript folder is not touched. Never replace the user's figure files yourself: they decide when the new versions go in.
+`compare` puts each current figure next to its new version, both at the printed width, with a table of scale factors and character sizes; add `--before DIR` for figures the manuscript does not include, and `--png DIR` for one image per figure (before above after, same printed width) to show in slides, e-mails or a README. `preview` compiles a copy of the manuscript with the new figures in place and reports the page each figure lands on; the manuscript folder is not touched. Never replace the user's figure files yourself: they decide when the new versions go in.
 
 ## 1. Setup (do this first, every time)
 
@@ -149,6 +149,8 @@ If the user has a LaTeX document, measure it with `figproject.py init` (section 
 ## 7. Export
 
 ```python
+for _ in range(3):
+    fig.draw_without_rendering()  # let constrained layout settle, or the first file saved can differ from the second
 fig.savefig("figure.pdf", bbox_inches="tight", pad_inches=0.02)  # vector, for LaTeX
 fig.savefig("figure.png", dpi=600, bbox_inches="tight")          # only if a raster preview is needed
 ```

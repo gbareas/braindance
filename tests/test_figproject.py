@@ -159,6 +159,28 @@ def test_project_width_finish_and_record():
     assert any(f["check"] == "width" for f in out["findings"]), out["findings"]
 
 
+def test_layout_settles_before_saving():
+    # equal-aspect panels next to a shared colourbar: constrained layout needs more than one draw to converge,
+    # and the first file saved used to be laid out differently from the second (titles cut off in the PDF)
+    fig, axes = plt.subplots(1, 2, figsize=(6.0, 2.4), layout="constrained")
+    for ax in axes:
+        mesh = ax.pcolormesh(np.arange(4), np.arange(4), np.arange(9).reshape(3, 3))
+        ax.set_aspect("equal")
+        ax.set_title("a long panel title that needs room")
+        ax.set_xlabel("x")
+    fig.colorbar(mesh, ax=axes, shrink=0.9)
+    first = [ax.get_position().bounds for ax in fig.axes]
+    fig.draw_without_rendering()
+    moved = [ax.get_position().bounds for ax in fig.axes] != first
+    assert fp.settle_layout(fig)
+    settled = [ax.get_position().bounds for ax in fig.axes]
+    fig.draw_without_rendering()
+    again = [ax.get_position().bounds for ax in fig.axes]
+    assert all(abs(a - b) < 1e-4 for p, q in zip(settled, again) for a, b in zip(p, q))
+    plt.close(fig)
+    print("    (layout moved on the first draw)" if moved else "    (layout converged on the first draw)")
+
+
 def test_measure_two_columns():
     if not HAS_LATEX:
         print("skip (no pdflatex)")
@@ -181,8 +203,9 @@ def test_compare_and_preview():
     proj = fp.Project(root)
     fig, sources = _draw(proj, "one", proj.width("one"))
     proj.finish(fig, "one", sources)
-    pdf, table = fp.compare(root)
+    pdf, table = fp.compare(root, png=root / "stacked", dpi=60)
     assert pdf.exists() and [r["name"] for r in table] == ["one"]
+    assert Path(table[0]["png"]).exists() and Path(table[0]["png"]).parent == root / "stacked"
     assert abs(table[0]["after_scale"] - 1.0) < 0.01 and table[0]["before_scale"] < 0.8
     report = fp.preview(root)
     assert Path(report["pdf"]).exists() and report["replaced"] == ["one"], report

@@ -820,6 +820,7 @@ class Project:
 
         self.out.mkdir(parents=True, exist_ok=True)
         pdf, png = self.out / f"{name}.pdf", self.out / f"{name}.png"
+        settle_layout(fig)
         fig.savefig(pdf)
         fig.savefig(png, dpi=png_dpi)
         drawn = float(fig.get_size_inches()[0])
@@ -866,6 +867,26 @@ class Project:
 # Before and after
 # ──────────────────────────────────────────────────────────────────────────
 
+def settle_layout(fig, max_draws=6, tol=1e-4):
+    """Draw until the axes stop moving.
+
+    The constrained layout engine is not always converged after one draw (axes with a fixed aspect next to a
+    colourbar, for example), so the first file saved can be laid out differently from the second: text cut off at
+    the edge of the PDF while the PNG saved right after it is fine. Drawing until positions are stable makes every
+    file and the measured checks see the same layout.
+    """
+    def positions():
+        return [ax.get_position().bounds for ax in fig.axes]
+    before = positions()
+    for _ in range(max_draws):
+        fig.draw_without_rendering()
+        now = positions()
+        if len(now) == len(before) and all(abs(a - b) <= tol for p, q in zip(now, before) for a, b in zip(p, q)):
+            return True
+        before = now
+    return False
+
+
 def glyph_sizes(pdf):
     """Font sizes (pt) set by the Tf operators of a PDF's content streams; approximate."""
     data = Path(pdf).read_bytes()
@@ -911,8 +932,28 @@ def _pick(folder, name):
     return None
 
 
-def compare(record_path=None, before=None, after=None, out=None):
-    """Build before_after.pdf. Returns its path and the table rows."""
+def _stack_image(old, new, printed, scale_b, gb, ga, out_png, dpi):
+    """One PNG: the old figure above the new one, both at the printed width, so text sizes compare as printed."""
+    small = lambda g, k: rf", smallest text {k * min(g):.1f}\,pt" if g else ""  # noqa: E731
+    drawn = (rf"drawn {printed / scale_b:.2f}\,in wide, printed at {100 * scale_b:.0f}\,\%"
+             if abs(scale_b - 1) > 0.02 else "drawn at the printed size")
+    body = (rf"\begin{{minipage}}{{{printed:.4f}in}}"
+            rf"\textbf{{Before}}: {drawn}{small(gb, scale_b)}.\par\smallskip"
+            rf"\includegraphics[width={printed:.4f}in]{{{old}}}\par\bigskip"
+            rf"\textbf{{After}}: drawn at the printed size, {printed:.2f}\,in{small(ga, 1.0)}.\par\smallskip"
+            rf"\includegraphics[width={printed:.4f}in]{{{new}}}\end{{minipage}}")
+    tex = (r"\documentclass[border=8pt,10pt]{standalone}\usepackage{graphicx}" "\n"
+           r"\begin{document}" + body + r"\end{document}" "\n")
+    with tempfile.TemporaryDirectory() as tmp:
+        pdf = _compile(tex, "stack", Path(tmp) / "stack.pdf", runs=1)
+        _run(["pdftoppm", "-png", "-r", str(dpi), "-singlefile", str(pdf), str(Path(tmp) / "stack")])
+        Path(out_png).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy(Path(tmp) / "stack.png", out_png)
+    return Path(out_png)
+
+
+def compare(record_path=None, before=None, after=None, out=None, png=None, dpi=150):
+    """Build before_after.pdf, and with `png` a folder one image per figure. Returns the PDF path and the table rows."""
     proj = Project(record_path)
     after = Path(after).resolve() if after else proj.out
     before = Path(before).resolve() if before else None
@@ -950,6 +991,9 @@ def compare(record_path=None, before=None, after=None, out=None):
                           before_glyphs=(scale_b * min(gb), scale_b * max(gb)) if gb else None,
                           after_glyphs=(scale_a * min(ga), scale_a * max(ga)) if ga else None,
                           checks=s))
+        if png:
+            table[-1]["png"] = str(_stack_image(old, new, printed, scale_b, gb, [scale_a * g for g in ga],
+                                                Path(png) / f"{name}.png", dpi))
         rows.append(rf"\texttt{{\detokenize{{{name}}}}} & {num} & {100 * scale_b:.0f}\,\% & {rng(gb, scale_b)} & "
                     rf"{100 * scale_a:.0f}\,\% & {rng(ga, scale_a)} & "
                     + (f"{s['fail']} / {s['warn']}" if s else "--") + r" \\")
@@ -1121,6 +1165,8 @@ def main(argv=None):
     p.add_argument("--before", help="folder with the old versions (default: what the manuscript includes)")
     p.add_argument("--after", help="folder with the new versions (default: output_dir)")
     p.add_argument("--out", help="the PDF to write (default: <after>/before_after.pdf)")
+    p.add_argument("--png", metavar="DIR", help="also write one PNG per figure, before above after, to DIR")
+    p.add_argument("--dpi", type=int, default=150, help="resolution of the PNGs (default 150)")
     p = sub.add_parser("preview", help="compile a copy of the manuscript with the new figures")
     p.add_argument("record", nargs="?")
     p.add_argument("--figures", help="folder with the new figures (default: output_dir)")
@@ -1132,7 +1178,7 @@ def main(argv=None):
     elif args.cmd == "index":
         index(args.record)
     elif args.cmd == "compare":
-        compare(args.record, args.before, args.after, args.out)
+        compare(args.record, args.before, args.after, args.out, args.png, args.dpi)
     elif args.cmd == "preview":
         report = preview(args.record, args.figures, args.out)
         print_preview(report)

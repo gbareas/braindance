@@ -517,11 +517,15 @@ def _texts(fig):
                       ("y offset text", ax.yaxis.get_offset_text())):
             out.append((f"ax{i} {nm}", t))
         for axis_name, axis in (("x", ax.xaxis), ("y", ax.yaxis)):
-            lo, hi = sorted(axis.get_view_interval())
+            # compare in the axis' own scale: on a log axis a linear margin can exceed the lower limit
+            scale = axis.get_transform()
+            lo, hi = sorted(scale.transform(np.asarray(axis.get_view_interval(), dtype=float)))
             pad = 1e-9 * (hi - lo)
             for major, ticks in ((True, axis.get_major_ticks()), (False, axis.get_minor_ticks())):
                 for tick in ticks:
-                    if not (lo - pad <= tick.get_loc() <= hi + pad):
+                    with np.errstate(all="ignore"):
+                        loc = float(scale.transform(np.array([tick.get_loc()], dtype=float))[0])
+                    if not (np.isfinite(loc) and lo - pad <= loc <= hi + pad):
                         continue
                     for lab in (tick.label1, tick.label2):
                         if lab.get_visible():
@@ -674,7 +678,8 @@ def check_style(rep, fig, target=None):
                 rep.add("fail", "style", "colormap", f"colormap {name!r} is not perceptually uniform; use "
                         "viridis or cividis (sequential) or RdBu_r (diverging)", f"ax{i}")
 
-        # series told apart by colour alone
+        # series told apart by colour alone: same line style, marker and line width, different colours
+        # (series of one colour, such as reference lines labelled in place, are not told apart by colour)
         labelled = [s for s in series if s["kind"] in ("line", "errorbar") and (s["label"] or s["gid"])]
         seen = {}
         for s in labelled:
@@ -683,11 +688,14 @@ def check_style(rep, fig, target=None):
             ls = "None" if ls in ("None", "none", "", " ") else ls
             mk = a.get_marker()
             mk = "None" if mk in ("None", "none", "", " ", None) else str(mk)
-            seen.setdefault((ls, mk), []).append(s["gid"] or s["label"])
-        for (ls, mk), names in seen.items():
-            if len(names) > 1:
-                rep.add("warn", "style", "colour-only", f"series {names} share line style {ls!r} and marker "
-                        f"{mk!r}, so they differ only by colour and merge in greyscale", f"ax{i}")
+            lw = round(float(a.get_linewidth()), 1) if ls != "None" else None
+            colour = mpl.colors.to_hex(a.get_color())
+            seen.setdefault((ls, mk, lw), []).append((s["gid"] or s["label"], colour))
+        for (ls, mk, lw), members in seen.items():
+            if len(members) > 1 and len({c for _, c in members}) > 1:
+                rep.add("warn", "style", "colour-only", f"series {[n for n, _ in members]} share line style "
+                        f"{ls!r}, marker {mk!r} and line width, so they differ only by colour and merge in "
+                        "greyscale", f"ax{i}")
 
     rep.measured["usetex"] = bool(mpl.rcParams["text.usetex"])
 
