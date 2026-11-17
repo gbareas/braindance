@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "skills" / "latex-scientific-plots"))
-from check_figure import Report, check_figure, check_pdf, check_script  # noqa: E402
+from check_figure import Report, _texts, check_figure, check_pdf, check_script  # noqa: E402
 
 plt.rcParams.update({"text.usetex": False, "mathtext.fontset": "cm", "font.family": "serif",
                      "font.serif": ["cmr10"], "axes.formatter.use_mathtext": True, "font.size": 9,
@@ -215,6 +215,32 @@ def test_legend_on_data_title_offset_width_and_colour_only():
     assert out["ok"]  # all of these are warnings, not failures
     for check in ("covers-data", "axes-title", "offset-text", "width", "colour-only"):
         assert found(out, check, "warn"), check
+
+
+def test_colour_only_ignores_same_colour_and_different_width():
+    fig, ax = plt.subplots()
+    ax.plot(T, A, "-o", label="A")
+    ax.plot(T, B, "--s", label="B")
+    for k in (1, 2):   # identical grey guides, labelled in place: not told apart by colour
+        ax.plot(T, A / (k + 1), color="0.5", ls=":", gid=f"guide-{k}")
+    ax.plot(T, B / 2, color="black", lw=2.0, ls="-", marker="o", gid="thick")   # wider than A
+    ax.set_xlabel(r"Time $t$ (s)")
+    ax.set_ylabel(r"Amplitude $x$")
+    out = run(fig, [SRC_A, SRC_B] + [{"gid": g, "computed": True} for g in ("guide-1", "guide-2", "thick")])
+    assert not found(out, "colour-only"), found(out, "colour-only")
+
+
+def test_tick_labels_outside_log_limits_are_ignored():
+    # matplotlib keeps tick labels just outside the limits; on a log axis spanning many decades a margin
+    # computed in linear units used to let them through, and they were reported as text off the canvas
+    fig, ax = plt.subplots()
+    ax.plot(T, 1e-9 + A, "-o", label="A")
+    ax.set(yscale="log", ylim=(1e-10, 0.5), xlabel=r"Time $t$ (s)", ylabel=r"Error $e$")
+    fig.canvas.draw()
+    outside = {id(t.label1) for t in ax.yaxis.get_major_ticks() if not 1e-10 <= t.get_loc() <= 0.5}
+    assert outside, "expected matplotlib to keep ticks outside the limits"
+    assert not [d for d, t in _texts(fig) if id(t) in outside]
+    plt.close(fig)
 
 
 def test_legend_cut_off():
