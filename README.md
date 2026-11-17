@@ -55,7 +55,6 @@ Then ask Claude Code for a figure; the skill loads as `braindance:latex-scientif
 - `agents/figure-reviewer.md` - the reviewer
 - `tests/` - `python tests/test_check_figure.py` and `python tests/test_figproject.py`
 - `docs/` - analysis and design notes; `docs/examples/` - the synthetic before-and-after examples above (`build.py` rebuilds them)
-- `reference/paper-orchestra/` - verbatim copies (original paths kept, source commit in SOURCE_COMMIT.txt) of the plotting code of Google Research's [PaperOrchestra](https://github.com/google-research/paper-orchestra) and its dependencies (Apache-2.0, Copyright 2026 Google LLC), for study only. Nothing in the plugin runs it.
 
 ## Roadmap
 
@@ -63,8 +62,12 @@ Then ask Claude Code for a figure; the skill loads as `braindance:latex-scientif
 - **0.2** - done so far: the per-manuscript figure record (`figures.yaml`) with target sizes measured from the LaTeX, the shared style, sources and check results; the caption index (`FIGURES.md`); `compare` and `preview`. Still to come: a grader agent that reads the part of the manuscript citing the figure and scores it, keeping the best round; checks of the numbers written in heatmap and table cells
 - **0.3** - schematics and diagrams
 
-Background: the project began as a study of the PaperOrchestra plotting agent (`docs/reference-plotting-agent.md`). A comparison with our own earlier agent is still to be filled in (`docs/comparison-template.md`).
+Background: the project began as a study of the plotting agent of Google Research's [PaperOrchestra](https://github.com/google-research/paper-orchestra) (Apache-2.0), summarised in `docs/reference-plotting-agent.md`. None of its code is included here; that file was written against upstream commit `d9bae997e793a015ed38bb1605be9eb58c00284f`.
 
 ## Credits
 
 Chart-choice guidance adapted from From Data to Viz by Yan Holtz and Conor Healy (MIT). Colour cycle by Okabe and Ito.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
