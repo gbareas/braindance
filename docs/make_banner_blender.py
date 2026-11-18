@@ -1,4 +1,4 @@
-"""Renders docs/banner.jpg with Blender: the name in hand-drawn double-stroke
+"""Renders docs/banner.jpg with Blender: the name in hand-drawn, extruded double-stroke
 letters, glowing ice blue on black, over a measured curve with its data points.
 The letterforms are defined below as polylines (no font file is used for them).
 
@@ -72,10 +72,31 @@ def tube(points, radius, mat, y):
     return o
 
 
-def outlined(points, r_out, r_in):
+def outlined(points, r_out, r_in, mat=None, y=0.0):
     """Double stroke: a glowing tube with a black one in front, so only its two edges show."""
-    tube(points, r_out, GLOW, 0.0)
-    tube(points, r_in, BLACK, -r_out - 0.01)
+    tube(points, r_out, mat or GLOW, y)
+    tube(points, r_in, BLACK, y - r_out - 0.01)
+
+
+DEPTH = (0.34, 0.8, -0.27)   # extrusion of the letters: x, depth, z
+GLOW_BACK, GLOW_EDGE = emission("glow_back", ICE, 2.5), emission("glow_edge", ICE, 2.0)
+
+
+def extruded(points, r_out, r_in):
+    """A letter stroke with depth: the front double stroke, a thin dimmer copy pushed back
+    and down-right, and thin edges joining their corners."""
+    dx, dy, dz = DEPTH
+    outlined(points, r_out, r_in)
+    tube([(x + dx, z + dz) for x, z in points], r_out * 0.3, GLOW_BACK, dy)
+    for x, z in points:
+        c = bpy.data.curves.new("edge", "CURVE")
+        c.dimensions, c.bevel_depth = "3D", r_out * 0.3
+        sp = c.splines.new("POLY")
+        sp.points.add(1)
+        sp.points[0].co, sp.points[1].co = (x, 0.0, z, 1), (x + dx, dy, z + dz, 1)
+        o = bpy.data.objects.new("edge", c)
+        scene.collection.objects.link(o)
+        c.materials.append(GLOW_EDGE)
 
 
 # title
@@ -85,7 +106,7 @@ total = (sum(widths) + GAP * (len(word) - 1)) * scale
 x0, z0 = -total / 2, 0.55
 for ch, w in zip(word, widths):
     for line in LETTERS[ch]:
-        outlined([(x0 + x * scale, z0 + z * scale) for x, z in line], r_out, r_in)
+        extruded([(x0 + x * scale, z0 + z * scale) for x, z in line], r_out, r_in)
     x0 += (w + GAP) * scale
 
 # a measured curve with its fit and data points, under the title
@@ -97,7 +118,7 @@ for xi, fi in zip(X[::10], fit[::10]):
     zi = -1.6 + 1.5 * (fi + rng.normal(0, 0.04))
     ring = [(xi + 0.09 * math.cos(t), zi + 0.09 * math.sin(t)) for t in np.linspace(0, 2 * np.pi, 25)]
     tube(ring, 0.018, GLOW, 0.0)
-for zz in (-1.8, 0.2):
+for zz in (-1.8, 0.05):
     tube([(-total / 2, zz), (total / 2, zz)], 0.008, emission("rule", ICE, 2.0), 0.0)
 
 # subtitle in wide-tracked capitals
