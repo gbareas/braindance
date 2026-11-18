@@ -1,6 +1,11 @@
 # braindance
 
+**Publication-ready matplotlib figures, with every plotted value checked against its source file.**
+
 [![tests](https://github.com/gbareas/braindance/actions/workflows/tests.yml/badge.svg)](https://github.com/gbareas/braindance/actions/workflows/tests.yml)
+
+![Four figures redrawn with braindance, each shown before and after at printed size](docs/examples/images/demo.gif)
+
 
 A plotting agent that turns raw data into publication-quality figures. It is a [Claude Code](https://claude.com/claude-code) plugin: a skill that sets the house style, a checker that compares every plotted value with its source file, and a reviewer agent that reads the result before it is handed over.
 
@@ -34,6 +39,23 @@ Four figures of a small synthetic manuscript, first as many drafts are drawn (ma
 
 ## Install
 
+### Without Claude: the checks and the manuscript tools
+
+```bash
+pip install git+https://github.com/gbareas/braindance
+```
+
+This installs two commands and the house style:
+
+```bash
+braindance-check --pdf figure.pdf --script plot.py --width 3.4   # PDF fonts and size, data typed into the script
+braindance-figs init path/to/main.tex                            # measure a manuscript, write figures.yaml
+```
+
+In a plotting script, `from check_figure import check_figure` compares the figure you drew with its data files, as in `skills/latex-scientific-plots/example.py`. `from figproject import Project` gives the per-manuscript workflow described in `skills/latex-scientific-plots/SKILL.md`, and `figproject.style_path()` returns the path of the style file. The agent and reviewer below need Claude Code; the checks do not.
+
+### As a Claude Code plugin
+
 Requires Python with numpy, matplotlib and PyYAML. A LaTeX installation is used when present (otherwise matplotlib's mathtext with Computer Modern), and poppler-utils (`pdffonts`, `pdfinfo`) for the PDF checks.
 
 Inside Claude Code (2.1.275 or later):
@@ -55,7 +77,7 @@ Then ask Claude Code for a figure; the skill loads as `braindance:latex-scientif
 
 - `skills/latex-scientific-plots/` - the skill: `SKILL.md`, the style file, `check_figure.py`, `figproject.py`, `chart-choice.md` and a worked example with its data
 - `agents/figure-reviewer.md` - the reviewer
-- `tests/` - `python tests/test_check_figure.py` and `python tests/test_figproject.py`
+- `tests/` - run `python tests/test_check_figure.py` and `python tests/test_figproject.py` (plain scripts, no pytest needed)
 - `docs/` - analysis and design notes; `docs/examples/` - the synthetic before-and-after examples above (`build.py` rebuilds them)
 
 ## Roadmap
@@ -69,6 +91,10 @@ Background: the project began as a study of the plotting agent of Google Researc
 ## Credits
 
 Chart-choice guidance adapted from From Data to Viz by Yan Holtz and Conor Healy (MIT). Colour cycle by Okabe and Ito.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and the [changelog](CHANGELOG.md).
 
 ## License
 

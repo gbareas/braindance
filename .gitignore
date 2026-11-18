@@ -9,3 +9,6 @@ docs/examples/paper/figures/
 docs/examples/paper/braindance_figures/
 docs/examples/paper/figures.yaml
 docs/examples/paper/FIGURES.md
+build/
+*.egg-info/
+dist/

@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "braindance"
+version = "0.1.0"
+description = "Publication-ready scientific figures: LaTeX text, journal sizes, vector PDF, and plotted values checked against the source data."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.10"
+authors = [{ name = "gbareas" }]
+keywords = ["matplotlib", "latex", "scientific-figures", "plotting", "papers"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Visualization",
+]
+dependencies = ["numpy", "matplotlib", "pyyaml"]
+
+[project.urls]
+Homepage = "https://github.com/gbareas/braindance"
+
+[project.scripts]
+braindance-check = "check_figure:main"
+braindance-figs = "figproject:main"
+
+[tool.setuptools]
+py-modules = ["check_figure", "figproject"]
+package-dir = { "" = "skills/latex-scientific-plots" }
+
+[tool.setuptools.data-files]
+"share/braindance" = ["skills/latex-scientific-plots/latex-paper.mplstyle"]
