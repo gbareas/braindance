@@ -56,6 +56,20 @@ from pathlib import Path
 import numpy as np
 
 SKILL_DIR = Path(__file__).resolve().parent
+STYLE_NAME = "latex-paper.mplstyle"
+
+
+def style_path():
+    """Path of the house style: next to this file in the plugin, or in the
+    shared data folder when installed with pip."""
+    here = SKILL_DIR / STYLE_NAME
+    if here.exists():
+        return here
+    installed = Path(sys.prefix) / "share" / "braindance" / STYLE_NAME
+    if installed.exists():
+        return installed
+    raise FileNotFoundError(f"{STYLE_NAME} not found next to figproject.py or in {installed.parent}")
+
 RECORD_NAME = "figures.yaml"
 INDEX_NAME = "FIGURES.md"
 DEFAULT_OUTPUT = "braindance_figures"
@@ -769,7 +783,7 @@ class Project:
         """Apply the house style. Returns True if text is typeset with LaTeX."""
         import matplotlib as mpl
         import matplotlib.pyplot as plt
-        plt.style.use(str(SKILL_DIR / "latex-paper.mplstyle"))
+        plt.style.use(str(style_path()))
         has_latex = shutil.which("latex") is not None
         if has_latex:
             mpl.rcParams.update({
