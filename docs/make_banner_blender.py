@@ -6,9 +6,16 @@ The letterforms are defined below as polylines (no font file is used for them).
     # or with the bpy module from PyPI (Python 3.11): pip install bpy==4.2.0 numpy pillow
     python docs/make_banner_blender.py
 
-Cycles on the CPU; no GPU needed. About half a minute.
+With --animate (after "--" when run by blender) it renders docs/banner.gif instead:
+the title switches on like a neon sign, the data points appear, the fit is drawn
+through them, then the tagline. Frames are kept in docs/banner_frames/ and only
+missing ones are rendered, so an interrupted run can be resumed.
+
+Cycles on the CPU; no GPU needed. The still takes about half a minute, the
+animation a few minutes.
 """
 import math
+import sys
 from pathlib import Path
 
 import bpy
@@ -53,6 +60,7 @@ def emission(name, colour, strength):
 
 
 GLOW, BLACK = emission("glow", ICE, 6.0), emission("black", (0, 0, 0), 0.0)
+DOTS = emission("dots", ICE, 6.0)
 
 
 def tube(points, radius, mat, y):
@@ -113,13 +121,15 @@ for ch, w in zip(word, widths):
 x = np.linspace(0, 1, 200)
 fit = 0.5 + 0.45 * np.sin(2 * np.pi * (1.5 * x + 0.05)) * np.exp(-1.6 * x)
 X, Z = -total / 2 + total * x, -1.6 + 1.5 * fit
-tube(list(zip(X, Z)), 0.025, emission("fit", ICE, 4.0), 0.0)
+fit_line = tube(list(zip(X, Z)), 0.025, emission("fit", ICE, 4.0), 0.0)
+dots = []
 for xi, fi in zip(X[::10], fit[::10]):
     zi = -1.6 + 1.5 * (fi + rng.normal(0, 0.04))
     ring = [(xi + 0.09 * math.cos(t), zi + 0.09 * math.sin(t)) for t in np.linspace(0, 2 * np.pi, 25)]
-    tube(ring, 0.018, GLOW, 0.0)
+    dots.append(tube(ring, 0.018, DOTS, 0.0))
+RULE = emission("rule", ICE, 2.0)
 for zz in (-1.8, 0.05):
-    tube([(-total / 2, zz), (total / 2, zz)], 0.008, emission("rule", ICE, 2.0), 0.0)
+    tube([(-total / 2, zz), (total / 2, zz)], 0.008, RULE, 0.0)
 
 # subtitle in wide-tracked capitals
 bpy.ops.object.text_add(location=(0, 0, -2.35), rotation=(math.radians(90), 0, 0))
@@ -129,7 +139,8 @@ t.data.font = bpy.data.fonts.load(SUB_FONT)
 t.data.size = 0.38
 t.data.space_character = 1.35
 t.data.align_x, t.data.align_y = "CENTER", "CENTER"
-t.data.materials.append(emission("sub", ICE, 3.0))
+SUB = emission("sub", ICE, 3.0)
+t.data.materials.append(SUB)
 
 # camera: orthographic, straight on
 bpy.ops.object.camera_add(location=(0, -20, 0.2), rotation=(math.radians(90), 0, 0))
@@ -161,14 +172,70 @@ comp = nt.nodes.new("CompositorNodeComposite")
 nt.links.new(rl.outputs["Image"], glare.inputs["Image"])
 nt.links.new(glare.outputs["Image"], comp.inputs["Image"])
 
-scene.render.filepath = str(OUT_RAW)
-bpy.ops.render.render(write_still=True)
-
-# a little film grain, then JPEG
 from PIL import Image  # noqa: E402
 
-img = np.asarray(Image.open(OUT_RAW).convert("RGB"), dtype=np.float32)
-img += rng.normal(0, 3.0, img.shape[:2])[..., None]
-Image.fromarray(np.clip(img, 0, 255).astype(np.uint8)).save(OUT, quality=92, optimize=True)
-OUT_RAW.unlink()
-print(OUT)
+
+_noise = {}
+
+
+def grain(path):
+    """Add film grain; the same grain on every frame, so unchanged areas compress in the GIF."""
+    img = np.asarray(Image.open(path).convert("RGB"), dtype=np.float32)
+    if img.shape not in _noise:
+        _noise[img.shape] = np.random.default_rng(1).normal(0, 3.0, img.shape[:2])[..., None]
+    img += _noise[img.shape]
+    return Image.fromarray(np.clip(img, 0, 255).astype(np.uint8))
+
+
+def strength(mat, value):
+    mat.node_tree.nodes["Emission"].inputs["Strength"].default_value = value
+
+
+TITLE = {m: m.node_tree.nodes["Emission"].inputs["Strength"].default_value for m in (GLOW, GLOW_BACK, GLOW_EDGE, RULE)}
+FLICKER = [0, 0, 0.6, 0, 0, 1, 0.15, 1, 0.4, 1, 1, 1]          # neon switching on
+N_DOTS, N_LINE, N_SUB, N_HOLD = 24, 24, 8, 6
+ORDER = rng.permutation(len(dots))                               # the points appear in random order
+
+
+def pose(f):
+    """Set the scene for frame f of the animation."""
+    k = min(f, len(FLICKER) - 1)
+    for m, s0 in TITLE.items():
+        strength(m, s0 * FLICKER[k])
+    f -= len(FLICKER)
+    shown = int(np.clip(np.ceil((f + 1) * len(dots) / N_DOTS), 0, len(dots)))
+    for j, d in enumerate(dots):
+        d.hide_render = j not in set(ORDER[:shown])
+    f -= N_DOTS
+    u = float(np.clip((f + 1) / N_LINE, 0, 1))
+    fit_line.data.bevel_factor_end = 0.5 - 0.5 * math.cos(math.pi * u)   # ease in and out
+    fit_line.hide_render = u == 0
+    f -= N_LINE
+    strength(SUB, 3.0 * float(np.clip((f + 1) / N_SUB, 0, 1)))
+
+
+if "--animate" in sys.argv:
+    frames_dir = HERE / "banner_frames"
+    frames_dir.mkdir(exist_ok=True)
+    n = len(FLICKER) + N_DOTS + N_LINE + N_SUB + N_HOLD
+    scene.render.resolution_x, scene.render.resolution_y = 960, 252
+    scene.cycles.samples = 24
+    for f in range(n):
+        path = frames_dir / f"{f:03d}.png"
+        if path.exists():
+            continue
+        pose(f)
+        scene.render.filepath = str(path)
+        bpy.ops.render.render(write_still=True)
+    frames = [grain(frames_dir / f"{f:03d}.png") for f in range(n)]
+    pal = frames[-1].quantize(colors=192, method=Image.Quantize.MEDIANCUT)
+    gif = [fr.quantize(palette=pal, dither=Image.Dither.NONE) for fr in frames]
+    durations = [70] * (n - 1) + [3500]
+    gif[0].save(HERE / "banner.gif", save_all=True, append_images=gif[1:], duration=durations, loop=0, optimize=True)
+    print(HERE / "banner.gif")
+else:
+    scene.render.filepath = str(OUT_RAW)
+    bpy.ops.render.render(write_still=True)
+    grain(OUT_RAW).save(OUT, quality=92, optimize=True)
+    OUT_RAW.unlink()
+    print(OUT)

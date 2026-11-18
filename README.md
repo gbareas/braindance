@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/banner.jpg" alt="braindance: publication-ready figures, every plotted value checked against its data"></p>
+<p align="center"><img src="docs/banner.gif" alt="braindance: publication-ready figures, every plotted value checked against its data"></p>
 
 [![tests](https://github.com/gbareas/braindance/actions/workflows/tests.yml/badge.svg)](https://github.com/gbareas/braindance/actions/workflows/tests.yml)
 [![licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)

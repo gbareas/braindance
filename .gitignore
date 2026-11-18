@@ -13,3 +13,4 @@ build/
 *.egg-info/
 dist/
 docs/banner_raw.png
+docs/banner_frames/
