@@ -1,9 +1,7 @@
-<p align="center"><img src="docs/banner.gif" alt="braindance: publication-ready figures, every plotted value checked against its data"></p>
+<p align="center"><img src="docs/banner.jpg" alt="braindance: publication-ready figures, every plotted value checked against its data"></p>
 
 [![tests](https://github.com/gbareas/braindance/actions/workflows/tests.yml/badge.svg)](https://github.com/gbareas/braindance/actions/workflows/tests.yml)
 [![licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
-
-**Publication-ready matplotlib figures, with every plotted value checked against its source file.**
 
 braindance sets a house style for scientific figures (LaTeX text, journal column widths, colourblind-safe colours, vector PDF) and runs measured checks that compare what is drawn with the data files it came from. It works as a plain Python package, and as a [Claude Code](https://claude.com/claude-code) plugin with a skill and a reviewer agent.
 

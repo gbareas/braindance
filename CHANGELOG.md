@@ -7,7 +7,7 @@ All notable changes are listed here. The format follows [Keep a Changelog](https
 ### Added
 - `pyproject.toml`: `pip install git+https://github.com/gbareas/braindance` installs `check_figure`, `figproject`, the house style, and the commands `braindance-check` and `braindance-figs`.
 - Demo GIF at the top of the README, `CONTRIBUTING.md`, issue and pull request templates.
-- Banner, rendered with Blender by `docs/make_banner_blender.py`: animated `docs/banner.gif` in the README, still `docs/banner.jpg` for the social preview.
+- Banner, rendered with Blender by `docs/make_banner_blender.py`: `docs/banner.jpg` at the top of the README, and an animated `docs/banner.gif` for slides and posts.
 - `figproject.apply_style()`: the house style with a Computer Modern fallback when LaTeX is not installed, usable without a `Project`.
 
 ### Changed
