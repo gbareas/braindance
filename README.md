@@ -1,5 +1,7 @@
 # braindance
 
+[![tests](https://github.com/gbareas/braindance/actions/workflows/tests.yml/badge.svg)](https://github.com/gbareas/braindance/actions/workflows/tests.yml)
+
 A plotting agent that turns raw data into publication-quality figures. It is a [Claude Code](https://claude.com/claude-code) plugin: a skill that sets the house style, a checker that compares every plotted value with its source file, and a reviewer agent that reads the result before it is handed over.
 
 ## What it does
