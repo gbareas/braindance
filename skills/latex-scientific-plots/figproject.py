@@ -70,6 +70,24 @@ def style_path():
         return installed
     raise FileNotFoundError(f"{STYLE_NAME} not found next to figproject.py or in {installed.parent}")
 
+
+def apply_style():
+    """Apply the house style. Text is typeset with LaTeX when it is installed,
+    otherwise with matplotlib's mathtext in Computer Modern. Returns True if LaTeX is used."""
+    import matplotlib as mpl
+    import matplotlib.pyplot as plt
+    plt.style.use(str(style_path()))
+    has_latex = shutil.which("latex") is not None
+    if has_latex:
+        mpl.rcParams.update({
+            "text.usetex": True,
+            "text.latex.preamble": r"\usepackage{amsmath}\usepackage{amssymb}\usepackage{siunitx}",
+        })
+    else:
+        mpl.rcParams.update({"text.usetex": False, "mathtext.fontset": "cm", "font.family": "serif",
+                             "font.serif": ["cmr10"], "axes.formatter.use_mathtext": True})
+    return has_latex
+
 RECORD_NAME = "figures.yaml"
 INDEX_NAME = "FIGURES.md"
 DEFAULT_OUTPUT = "braindance_figures"
@@ -782,17 +800,7 @@ class Project:
     def setup(self):
         """Apply the house style. Returns True if text is typeset with LaTeX."""
         import matplotlib as mpl
-        import matplotlib.pyplot as plt
-        plt.style.use(str(style_path()))
-        has_latex = shutil.which("latex") is not None
-        if has_latex:
-            mpl.rcParams.update({
-                "text.usetex": True,
-                "text.latex.preamble": r"\usepackage{amsmath}\usepackage{amssymb}\usepackage{siunitx}",
-            })
-        else:
-            mpl.rcParams.update({"text.usetex": False, "mathtext.fontset": "cm", "font.family": "serif",
-                                 "font.serif": ["cmr10"], "axes.formatter.use_mathtext": True})
+        has_latex = apply_style()
         # the canvas is the printed size: save it as it is, never cropped or padded
         mpl.rcParams["savefig.bbox"] = "standard"
         return has_latex
