@@ -244,7 +244,7 @@ def sweep():
 
 
 if __name__ == "__main__":
-    P.setup()
+    P.setup(personal=False)  # the README shows the house style, whoever rebuilds it
     overview()
     convergence()
     results_table()

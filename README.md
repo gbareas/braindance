@@ -5,7 +5,8 @@ A plotting agent that turns raw data into publication-quality figures. It is a [
 ## What it does
 
 - **House style.** All text and numbers in LaTeX (Computer Modern), figures created at the printed column width, colourblind-safe colours, vector PDF.
-- **Measured checks** (`check_figure.py`). The values drawn equal the values in the source files, every declared series is in the figure, no point is hidden by axis limits or a log axis. It also measures width, font sizes, overlapping text, legends or labels sitting on data, colormaps, and the fonts and page size of the saved PDF.
+- **Your own style** (`style_profile.py`). The rules that keep a figure correct and readable are the same for everyone. Taste is yours: a profile (`~/.config/braindance/profile.yaml`) holds your colours, colormaps, font (Computer Modern, Times, Helvetica or your own), ticks, frames and any other matplotlib setting, and every figure is drawn with it. A manuscript can add its own layer on top, for example to meet a journal's font requirement or to give every co-author the same look. Your colours are checked instead of replaced. `style_profile.py check` simulates them as colour-blind readers and greyscale print see them, and when two merge it suggests the nearest palette with the same hues: only lightness and chroma move, and only for the colours that clash. The reviewer judges taste by your profile, not by the house style. `style_profile.py learn` drafts the profile from your past work (figure and paper PDFs, matplotlib scripts, style files): palette and its order, colormaps, ticks, frames, grid and line widths, each with the evidence it came from, and a preview figure to confirm it.
+- **Measured checks** (`check_figure.py`). The values drawn equal the values in the source files, every declared series is in the figure, no point is hidden by axis limits or a log axis. It also measures width, font sizes, overlapping text, legends or labels sitting on data, colormaps, series whose colours merge for colour-blind readers, and the fonts and page size of the saved PDF.
 - **Manuscript projects** (`figproject.py`). Point it at the main `.tex` file: it compiles the preamble to measure the text width, `\linewidth` in `figure` and `figure*`, and the font sizes, then records every figure with the width it is printed at in `figures.yaml`, and writes `FIGURES.md`, an index of the figures with their captions. Plotting scripts take their width and shared colours from the record, and every check result is written back to it. Two commands show the result: `compare` (each current figure next to its new version at print size) and `preview` (the manuscript compiled with the new figures, nothing overwritten).
 - **Chart choice** (`chart-choice.md`). Which chart suits which data and the rules that hold for any chart, adapted from [From Data to Viz](https://www.data-to-viz.com).
 - **Review loop** (`figure-reviewer`). A separate agent looks at the rendered figure, the script and the check report, and returns PASS or a ranked list of fixes, for up to three rounds.
@@ -51,16 +52,16 @@ Then ask Claude Code for a figure; the skill loads as `braindance:latex-scientif
 
 ## Layout
 
-- `skills/latex-scientific-plots/` - the skill: `SKILL.md`, the style file, `check_figure.py`, `figproject.py`, `chart-choice.md` and a worked example with its data
+- `skills/latex-scientific-plots/` - the skill: `SKILL.md`, the style file, `style_profile.py`, `colours.py` and `learn_style.py`, `check_figure.py`, `figproject.py`, `chart-choice.md` and a worked example with its data
 - `agents/figure-reviewer.md` - the reviewer
-- `tests/` - `python tests/test_check_figure.py` and `python tests/test_figproject.py`
+- `tests/` - `python tests/test_check_figure.py`, `python tests/test_figproject.py`, `python tests/test_style_profile.py` and `python tests/test_learn_style.py`
 - `docs/` - analysis and design notes; `docs/examples/` - the synthetic before-and-after examples above (`build.py` rebuilds them)
 - `reference/paper-orchestra/` - verbatim copies (original paths kept, source commit in SOURCE_COMMIT.txt) of the plotting code of Google Research's [PaperOrchestra](https://github.com/google-research/paper-orchestra) and its dependencies (Apache-2.0, Copyright 2026 Google LLC), for study only. Nothing in the plugin runs it.
 
 ## Roadmap
 
 - **0.1** (this version) - skill and reviewer packaged as a plugin; data and style checks; chart-choice rules
-- **0.2** - done so far: the per-manuscript figure record (`figures.yaml`) with target sizes measured from the LaTeX, the shared style, sources and check results; the caption index (`FIGURES.md`); `compare` and `preview`. Still to come: a grader agent that reads the part of the manuscript citing the figure and scores it, keeping the best round; checks of the numbers written in heatmap and table cells
+- **0.2** - done so far: the per-manuscript figure record (`figures.yaml`) with target sizes measured from the LaTeX, the shared style, sources and check results; the caption index (`FIGURES.md`); `compare` and `preview`; personal and per-paper style profiles, with colour-vision checks of the palette and of every figure, learned from a researcher's past work. Still to come: a grader agent that reads the part of the manuscript citing the figure and scores it, keeping the best round; checks of the numbers written in heatmap and table cells
 - **0.3** - schematics and diagrams
 
 Background: the project began as a study of the PaperOrchestra plotting agent (`docs/reference-plotting-agent.md`). A comparison with our own earlier agent is still to be filled in (`docs/comparison-template.md`).

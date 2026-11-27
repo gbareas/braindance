@@ -6,31 +6,18 @@ Out:  example_figure.pdf (vector), example_figure.png (preview) and
       example_figure.check.json (data and style checks)
 """
 from pathlib import Path
-import shutil
 import sys
 
 import numpy as np
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from check_figure import check_figure, load_table  # noqa: E402
+from style_profile import setup  # noqa: E402
 
 OUT = Path(sys.argv[1]) if len(sys.argv) > 1 else Path.cwd()
-plt.style.use(HERE / "latex-paper.mplstyle")
-
-HAS_LATEX = shutil.which("latex") is not None
-if HAS_LATEX:
-    mpl.rcParams.update({
-        "text.usetex": True,
-        "text.latex.preamble": r"\usepackage{amsmath}\usepackage{amssymb}",
-    })
-else:
-    print("No LaTeX found: falling back to mathtext with Computer Modern.")
-    mpl.rcParams.update({"text.usetex": False, "mathtext.fontset": "cm",
-                         "font.serif": ["cmr10"],  # Computer Modern, ships with matplotlib
-                         "axes.formatter.use_mathtext": True})
+STYLE = setup()  # the house style plus your personal profile; prints which, and whether LaTeX is used
 
 WIDTH = 3.4  # inches: one journal column
 
@@ -87,7 +74,7 @@ ax2.text(0.96, 0.95, r"(b)", transform=ax2.transAxes, va="top", ha="right")
 pdf = OUT / "example_figure.pdf"
 fig.savefig(pdf)
 fig.savefig(OUT / "example_figure.png", dpi=300)
-print(f"Saved {pdf} and its PNG preview ({'LaTeX' if HAS_LATEX else 'mathtext fallback'} mode)")
+print(f"Saved {pdf} and its PNG preview ({'LaTeX' if STYLE.usetex else 'mathtext fallback'} mode)")
 
 report = check_figure(fig, sources, target={"width_in": WIDTH}, pdf=pdf, script=__file__)
 sys.exit(0 if report["ok"] else 1)

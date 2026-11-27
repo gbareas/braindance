@@ -6,8 +6,13 @@ Two families of checks:
          series is in the figure, and no point is hidden by axis limits or a
          log axis.
   style  Width, font sizes, overlapping text, legend or labels on data, axes
-         titles, offset text, colormaps, series that differ only by colour, and
-         the fonts and page size of the saved PDF.
+         titles, offset text, colormaps, series that differ only by colour,
+         series whose colours merge for colour-blind readers, and the fonts and
+         page size of the saved PDF.
+
+Taste is the researcher's: fonts are checked against the style profile applied
+by style_profile.setup() (Computer Modern when there is none), and the profile
+is recorded in the report so the reviewer judges the figure by it.
 
 In a plotting script, after everything is drawn and the PDF is saved:
 
@@ -47,7 +52,12 @@ from pathlib import Path
 
 import numpy as np
 
-BAD_CMAPS = {"jet", "rainbow", "gist_rainbow", "nipy_spectral", "gist_ncar"}
+SKILL_DIR = Path(__file__).resolve().parent
+if str(SKILL_DIR) not in sys.path:
+    sys.path.insert(0, str(SKILL_DIR))  # for colours.py and style_profile.py
+
+from colours import BAD_CMAPS, MIN_DE, VISIONS, delta_e, rgb_to_lab, simulate, to_rgb  # noqa: E402
+
 CM_FONT_PREFIXES = ("cm", "sfrm", "sfti", "sfbx", "lm", "ec", "msam", "msbm", "eufm", "rsfs")
 
 
@@ -696,8 +706,72 @@ def check_style(rep, fig, target=None):
                 rep.add("warn", "style", "colour-only", f"series {[n for n, _ in members]} share line style "
                         f"{ls!r}, marker {mk!r} and line width, so they differ only by colour and merge in "
                         "greyscale", f"ax{i}")
+        _check_colour_vision(rep, series, f"ax{i}")
 
     rep.measured["usetex"] = bool(mpl.rcParams["text.usetex"])
+
+
+def _series_look(s):
+    """(colour, everything else that tells a series apart) for a labelled series, or None."""
+    import matplotlib as mpl
+    a = s["artist"]
+    try:
+        if s["kind"] in ("line", "errorbar"):
+            ls = a.get_linestyle()
+            ls = "None" if ls in ("None", "none", "", " ") else ls
+            mk = a.get_marker()
+            mk = "None" if mk in ("None", "none", "", " ", None) else str(mk)
+            return mpl.colors.to_hex(a.get_color()), (ls, mk)
+        if s["kind"] == "scatter":
+            fc = a.get_facecolor()
+            if len(fc) != 1:
+                return None  # coloured by value: a colormap, not a series colour
+            paths = a.get_paths()
+            shape = tuple(np.round(paths[0].vertices, 3).ravel()) if paths else ()
+            return mpl.colors.to_hex(fc[0]), ("scatter", shape)
+        if s["kind"] == "bar" and s.get("patches"):
+            p = s["patches"][0]
+            return mpl.colors.to_hex(p.get_facecolor()), ("bar", p.get_hatch() or "")
+    except (TypeError, ValueError):
+        return None
+    return None
+
+
+def _check_colour_vision(rep, series, where, min_de=MIN_DE):
+    """Pairs of series whose colours merge for colour-blind readers.
+
+    A warn when the two series differ only by colour; an info when a marker, line style or hatch
+    still tells them apart.
+    """
+    looks = []
+    for s in series:
+        if not (s["label"] or s["gid"]):
+            continue
+        look = _series_look(s)
+        if look is not None:
+            looks.append((s["gid"] or s["label"], *look))
+    if len(looks) < 2:
+        return
+    rgb = np.array([to_rgb(c) for _, c, _ in looks])
+    labs = {v: rgb_to_lab(simulate(rgb, v)) for v in VISIONS}
+    for i in range(len(looks)):
+        for j in range(i + 1, len(looks)):
+            if looks[i][1] == looks[j][1]:
+                continue  # same colour on purpose (a family of series, a reference); not a colour pair
+            d = {v: float(delta_e(labs[v][i], labs[v][j])) for v in VISIONS}
+            v = min(d, key=d.get)
+            if d[v] >= min_de:
+                continue
+            who = f"{looks[i][0]!r} ({looks[i][1]}) / {looks[j][0]!r} ({looks[j][1]})"
+            seen = "even with normal vision" if v == "normal" else f"with {v} vision"
+            if looks[i][2] == looks[j][2]:
+                rep.add("warn", "style", "colour-vision", f"{who} differ only by colour, and their colours "
+                        f"merge {seen} (dE00 {d[v]:.1f} < {min_de:g}); change the lightness of one "
+                        "(python style_profile.py check suggests one that keeps the hue) or add a marker or "
+                        "line style", where)
+            else:
+                rep.add("info", "style", "colour-vision", f"{who} merge {seen} (dE00 {d[v]:.1f}); the marker "
+                        "or line style still tells them apart", where)
 
 
 # --------------------------------------------------------------------------
@@ -712,7 +786,8 @@ def _run(cmd):
     return res.stdout if res.returncode == 0 else None
 
 
-def check_pdf(rep, pdf, target=None):
+def check_pdf(rep, pdf, target=None, profile=None):
+    """Page size and fonts of the saved PDF. Fonts are checked against the profile's font."""
     pdf = Path(pdf)
     target = target or {}
     if not pdf.exists():
@@ -751,10 +826,19 @@ def check_pdf(rep, pdf, target=None):
     type3 = sorted({f["name"] for f in fonts if "Type 3" in f["type"]})
     if type3:
         rep.add("warn", "style", "pdf-fonts", f"Type 3 (bitmap) fonts: {', '.join(type3)}; set pdf.fonttype to 42")
-    other = sorted({f["name"] for f in fonts if not f["name"].lower().startswith(CM_FONT_PREFIXES)})
-    if other:
-        rep.add("warn", "style", "pdf-fonts", f"fonts that are not Computer Modern: {', '.join(other)}; "
-                "some text is not rendered in the document font")
+    if profile is None:
+        allowed, font_name = CM_FONT_PREFIXES, "Computer Modern"
+    else:
+        allowed, font_name = profile.pdf_font_prefixes(), f"the profile's font ({profile.font['preset']})"
+    if allowed:
+        allowed = tuple(a.lower() for a in allowed)
+        other = sorted({f["name"] for f in fonts if not f["name"].lower().startswith(allowed)})
+        if other:
+            rep.add("warn", "style", "pdf-fonts", f"fonts that are not {font_name}: {', '.join(other)}; "
+                    "some text is not rendered in the chosen font")
+    elif fonts:
+        rep.add("info", "style", "pdf-fonts", "the profile declares no pdf_fonts, so the fonts were not checked: "
+                + ", ".join(sorted({f["name"] for f in fonts})))
 
     out = _run(["pdfimages", "-list", str(pdf)])
     if out is not None:
@@ -795,7 +879,7 @@ def check_script(rep, script, min_literals=8):
 # --------------------------------------------------------------------------
 
 def check_figure(fig, sources=None, *, target=None, pdf=None, script=None, base_dir=None,
-                 out=None, rtol=1e-6, quiet=False):
+                 out=None, rtol=1e-6, quiet=False, profile=None):
     """Run every check on a drawn figure. Returns the report as a dict.
 
     sources   list of declarations, one per plotted series (see the module docstring).
@@ -808,14 +892,21 @@ def check_figure(fig, sources=None, *, target=None, pdf=None, script=None, base_
     script    path of the plotting script (__file__), scanned for typed-in data
     base_dir  folder that relative source paths are resolved against
               (default: the script's folder, else the current folder)
+    profile   the style profile the figure was drawn with (default: the one applied by
+              style_profile.setup(); with none, the house style)
     """
+    import style_profile
     rep = Report()
+    if profile is None:
+        profile = style_profile.active()
+    rep.measured["profile"] = profile.summary() if profile is not None else {
+        "name": "house style", "sources": ["style_profile.setup() was not called"], "font": "computer-modern"}
     if base_dir is None:
         base_dir = Path(script).resolve().parent if script else Path.cwd()
     check_data(rep, fig, sources, base_dir, rtol)
     check_style(rep, fig, target)
     if pdf:
-        check_pdf(rep, pdf, target)
+        check_pdf(rep, pdf, target, profile)
     if script:
         check_script(rep, script)
     result = rep.as_dict()
@@ -834,13 +925,25 @@ def main(argv=None):
     ap.add_argument("--pdf")
     ap.add_argument("--script")
     ap.add_argument("--width", type=float, help="target width in inches")
+    ap.add_argument("--profile", help="style profile file or figures.yaml the figure was drawn with "
+                    "(default: the personal profile, else the house style)")
     args = ap.parse_args(argv)
     if not (args.pdf or args.script):
         ap.error("give --pdf and/or --script")
+    import style_profile
+    if args.profile and Path(args.profile).name == "figures.yaml":
+        import yaml
+        rec = yaml.safe_load(Path(args.profile).read_text(encoding="utf-8")) or {}
+        profile = style_profile.load_profile(rec.get("profile"), base_dir=Path(args.profile).resolve().parent)
+    elif args.profile:
+        profile = style_profile.resolve(style_profile.read_profile(args.profile), [args.profile])
+    else:
+        profile = style_profile.load_profile()
     rep = Report()
+    rep.measured["profile"] = profile.summary()
     target = {"width_in": args.width} if args.width else {}
     if args.pdf:
-        check_pdf(rep, args.pdf, target)
+        check_pdf(rep, args.pdf, target, profile)
     if args.script:
         check_script(rep, args.script)
     print(rep.text())

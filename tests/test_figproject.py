@@ -3,12 +3,15 @@
 Run with `python tests/test_figproject.py` or with pytest. Tests that compile LaTeX are
 skipped when pdflatex is not installed.
 """
+import os
 import shutil
 import sys
 import tempfile
 from pathlib import Path
 
 import matplotlib
+
+os.environ["BRAINDANCE_PROFILE"] = "none"  # the house style, whatever personal profile the runner has
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -118,6 +121,33 @@ def test_record_keeps_style_and_results():
     assert rec["style"]["run"]["a"]["colour"] == "#0072B2"
     assert rec["figures"]["one"]["notes"] == "keep me"
     assert rec["figures"]["extra"] == {"in_manuscript": False, "script": "x.py"}
+
+
+def test_paper_profile_is_kept_applied_and_recorded():
+    import os
+    root = make_manuscript()
+    fp.init(root / "main.tex", textwidth="500pt", columnwidth="240pt", quiet=True)
+    rec = fp.load_record(root / "figures.yaml")
+    rec["profile"] = {"name": "Paper look", "palette": ["#123456", "#c0392b"], "rc": {"xtick.direction": "out"},
+                      "personal": False}
+    fp.save_record(root / "figures.yaml", rec)
+    fp.index(root, quiet=True)                      # re-indexing keeps the profile
+    assert fp.load_record(root / "figures.yaml")["profile"]["name"] == "Paper look"
+    old = os.environ.get("BRAINDANCE_PROFILE")
+    os.environ["BRAINDANCE_PROFILE"] = str(root / "no-such-personal-profile.yaml")  # ignored: personal: false
+    try:
+        proj = fp.Project(root)
+        fig, sources = _draw(proj, "one", proj.width("one"))
+        assert plt.rcParams["xtick.direction"] == "out"
+        assert [c["color"] for c in plt.rcParams["axes.prop_cycle"]] == ["#123456", "#c0392b"]
+        result = proj.finish(fig, "one", sources)
+    finally:
+        if old is None:
+            os.environ.pop("BRAINDANCE_PROFILE", None)
+        else:
+            os.environ["BRAINDANCE_PROFILE"] = old
+    assert result["measured"]["profile"]["name"] == "Paper look"
+    assert fp.load_record(root / "figures.yaml")["figures"]["one"]["check"]["profile"] == "Paper look"
 
 
 def _draw(proj, name, width):

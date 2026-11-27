@@ -548,6 +548,12 @@ _RECORD_HEADER = """\
 #                 style:
 #                   field:
 #                     u: {{colour: '#0072B2', marker: o, label: "$u'$"}}
+#   profile     the look of this paper's figures, on top of each author's personal
+#               profile (~/.config/braindance/profile.yaml): the keys of a style
+#               profile (palette, colormaps, font, rc, mplstyle), or the path of a
+#               profile file. Add `personal: false` to ignore personal profiles, so
+#               every co-author draws the same figures, for example
+#                 profile: {{font: helvetica, personal: false}}
 #   notes       under a figure, anything the next person should know
 #
 """
@@ -580,6 +586,7 @@ def merge_record(old, main_name, target, figs, output_dir=None):
         "output_dir": output_dir or old.get("output_dir") or DEFAULT_OUTPUT,
         "target": target,
         "style": old.get("style") or {},
+        **({"profile": old["profile"]} if old.get("profile") else {}),
         "figures": figures,
     }
 
@@ -765,23 +772,20 @@ class Project:
         return style if group is None else style.get(group, {})
 
     # drawing
-    def setup(self):
-        """Apply the house style. Returns True if text is typeset with LaTeX."""
+    def setup(self, personal=True, quiet=False):
+        """Apply the house style, the personal profile and this paper's `profile`.
+
+        Returns True if text is typeset with LaTeX; the applied profile is `self.profile`.
+        personal=False ignores the personal profile (as `personal: false` in figures.yaml does).
+        """
         import matplotlib as mpl
-        import matplotlib.pyplot as plt
-        plt.style.use(str(SKILL_DIR / "latex-paper.mplstyle"))
-        has_latex = shutil.which("latex") is not None
-        if has_latex:
-            mpl.rcParams.update({
-                "text.usetex": True,
-                "text.latex.preamble": r"\usepackage{amsmath}\usepackage{amssymb}\usepackage{siunitx}",
-            })
-        else:
-            mpl.rcParams.update({"text.usetex": False, "mathtext.fontset": "cm", "font.family": "serif",
-                                 "font.serif": ["cmr10"], "axes.formatter.use_mathtext": True})
+        sys.path.insert(0, str(SKILL_DIR))
+        from style_profile import setup as style_setup
+        self.profile = style_setup(paper=self.record.get("profile"), base_dir=self.dir, personal=personal,
+                                   quiet=quiet)
         # the canvas is the printed size: save it as it is, never cropped or padded
         mpl.rcParams["savefig.bbox"] = "standard"
-        return has_latex
+        return self.profile.usetex
 
     # source data
     def write_csv(self, name, **columns):
@@ -831,7 +835,8 @@ class Project:
         target = {"width_in": width_in} if width_in else {}
         if allow_title:
             target["allow_title"] = True
-        result = check_figure(fig, sources=sources, target=target, pdf=pdf, script=script, base_dir=self.source_dir)
+        result = check_figure(fig, sources=sources, target=target, pdf=pdf, script=script, base_dir=self.source_dir,
+                              profile=getattr(self, "profile", None))
         plt.close(fig)
         self._record_result(name, result, script, sources, drawn, pdf)
         try:
@@ -858,6 +863,7 @@ class Project:
         entry["sources"] = files
         s = result["summary"]
         entry["check"] = {"fail": s["fail"], "warn": s["warn"], "date": _today(),
+                          "profile": (result.get("measured", {}).get("profile") or {}).get("name"),
                           "report": self._rel(Path(result.get("report_path", pdf.with_suffix(".check.json"))))}
         save_record(self.record_path, record)
         self.record = record
